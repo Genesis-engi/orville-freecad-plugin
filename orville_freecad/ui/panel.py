@@ -43,6 +43,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
         self.current_job_id: Optional[str] = None
         self.current_status = ""
         self.downloaded_artifacts = {}
+        self.session_api_key: Optional[str] = None
         self.signals = _PanelSignals()
 
         self._build_ui()
@@ -149,7 +150,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
     def _refresh_key_status(self):
         try:
-            key = self.credential_store.get_api_key()
+            stored_key = self.credential_store.get_api_key()
         except CredentialStoreError as exc:
             self.status_label.setText("Key store unavailable")
             self._append_log(str(exc))
@@ -157,8 +158,10 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
         if os.getenv(ENV_VAR):
             self.status_label.setText(f"Using {ENV_VAR}")
-        elif key:
+        elif stored_key:
             self.status_label.setText("API key saved")
+        elif self.session_api_key:
+            self.status_label.setText("API key in session")
         else:
             self.status_label.setText("API key needed")
 
@@ -167,7 +170,15 @@ class OrvillePanel(QtWidgets.QDockWidget):
         try:
             self.credential_store.set_api_key(api_key)
         except (CredentialStoreError, ValueError) as exc:
-            self._show_error(str(exc))
+            if not api_key:
+                self._show_error(str(exc))
+                return
+            self.session_api_key = api_key
+            self.api_key_edit.clear()
+            self._refresh_key_status()
+            self._append_log(
+                "API key kept in memory for this FreeCAD session because secure OS storage is unavailable."
+            )
             return
 
         self.api_key_edit.clear()
@@ -175,14 +186,20 @@ class OrvillePanel(QtWidgets.QDockWidget):
         self._append_log("API key saved to the OS credential store.")
 
     def _clear_api_key(self):
+        self.session_api_key = None
         try:
             self.credential_store.delete_api_key()
         except CredentialStoreError as exc:
-            self._show_error(str(exc))
-            return
+            self._append_log(str(exc))
 
         self._refresh_key_status()
-        self._append_log("API key removed from the OS credential store.")
+        self._append_log("API key cleared.")
+
+    def _get_api_key(self) -> Optional[str]:
+        try:
+            return self.credential_store.get_api_key() or self.session_api_key
+        except CredentialStoreError:
+            return self.session_api_key
 
     def _attach_images(self):
         files, _ = QtWidgets.QFileDialog.getOpenFileNames(
@@ -222,14 +239,10 @@ class OrvillePanel(QtWidgets.QDockWidget):
             self._show_error("Prompt is required.")
             return
 
-        try:
-            api_key = self.credential_store.get_api_key()
-        except CredentialStoreError as exc:
-            self._show_error(str(exc))
-            return
+        api_key = self._get_api_key()
 
         if not api_key:
-            self._show_error(f"Save an API key or set {ENV_VAR}.")
+            self._show_error(f"Paste an API key and click Save, or set {ENV_VAR}.")
             return
 
         if self.current_job_id and self.current_status in {"queued", "running"}:
@@ -328,14 +341,10 @@ class OrvillePanel(QtWidgets.QDockWidget):
                 self._append_log(f"Downloaded: {existing_path}")
             return
 
-        try:
-            api_key = self.credential_store.get_api_key()
-        except CredentialStoreError as exc:
-            self._show_error(str(exc))
-            return
+        api_key = self._get_api_key()
 
         if not api_key:
-            self._show_error(f"Save an API key or set {ENV_VAR}.")
+            self._show_error(f"Paste an API key and click Save, or set {ENV_VAR}.")
             return
 
         self.signals.busy_changed.emit(True)
