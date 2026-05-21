@@ -1,24 +1,27 @@
 """FreeCAD GUI registration for the Orville workbench."""
 
-import os
-import sys
+import importlib as _importlib
+import os as _os
+import sys as _sys
 
-import FreeCAD as App
-import FreeCADGui as Gui
-
-from orville_freecad import metadata
+_globals = globals()
+_globals["_os"] = _os
+_globals["_sys"] = _sys
+_globals["App"] = _importlib.import_module("FreeCAD")
+_globals["Gui"] = _importlib.import_module("FreeCADGui")
+_globals["metadata"] = _importlib.import_module("orville_freecad.metadata")
 
 
 def _addon_root():
     module_file = globals().get("__file__")
     if not module_file:
-        module_file = sys._getframe().f_code.co_filename
-    return os.path.dirname(os.path.abspath(module_file))
+        module_file = _sys._getframe().f_code.co_filename
+    return _os.path.dirname(_os.path.abspath(module_file))
 
 
-ROOT_DIR = _addon_root()
-RESOURCE_DIR = os.path.join(ROOT_DIR, "resources")
-ICON_PATH = os.path.join(RESOURCE_DIR, "orville.svg")
+_globals["ROOT_DIR"] = _addon_root()
+_globals["RESOURCE_DIR"] = _os.path.join(_globals["ROOT_DIR"], "resources")
+_globals["ICON_PATH"] = _os.path.join(_globals["RESOURCE_DIR"], "orville.svg")
 
 
 class OrvilleWorkbench(Workbench):  # noqa: F821 - provided by FreeCAD at runtime
