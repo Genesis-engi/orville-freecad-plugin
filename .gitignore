@@ -1,0 +1,38 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+dist/
+build/
+*.egg-info/
+
+# FreeCAD/user-local state and generated CAD outputs
+*.FCStd1
+*.FCBak
+*.step
+*.stp
+downloads/
+artifacts/
+
+# Secrets and local configuration
+.env
+*.pem
+*.key
+orville_api_key*
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
