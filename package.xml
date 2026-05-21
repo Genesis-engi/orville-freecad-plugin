@@ -16,13 +16,13 @@
   <url type="repository" branch="main">https://github.com/ballistalabs/orville-freecad-plugin</url>
   <url type="readme">https://github.com/ballistalabs/orville-freecad-plugin/blob/main/README.md</url>
   <url type="documentation">https://www.ballistalabs.ai/docs/api</url>
-  <icon>resources/orville.svg</icon>
+  <icon>resources/orville.png</icon>
 
   <content>
     <workbench>
       <name>Orville Workbench</name>
       <subdirectory>./</subdirectory>
-      <icon>resources/orville.svg</icon>
+      <icon>resources/orville.png</icon>
       <classname>OrvilleWorkbench</classname>
     </workbench>
   </content>

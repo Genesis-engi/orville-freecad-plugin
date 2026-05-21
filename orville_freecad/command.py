@@ -15,7 +15,7 @@ _registered = False
 
 class OpenPanelCommand:
     def GetResources(self):
-        icon = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources", "orville.svg")
+        icon = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources", "orville.png")
         return {
             "Pixmap": icon,
             "MenuText": "Open Orville",

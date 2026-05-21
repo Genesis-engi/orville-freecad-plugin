@@ -21,7 +21,7 @@ def _addon_root():
 
 _globals["ROOT_DIR"] = _addon_root()
 _globals["RESOURCE_DIR"] = _os.path.join(_globals["ROOT_DIR"], "resources")
-_globals["ICON_PATH"] = _os.path.join(_globals["RESOURCE_DIR"], "orville.svg")
+_globals["ICON_PATH"] = _os.path.join(_globals["RESOURCE_DIR"], "orville.png")
 
 
 class OrvilleWorkbench(Workbench):  # noqa: F821 - provided by FreeCAD at runtime

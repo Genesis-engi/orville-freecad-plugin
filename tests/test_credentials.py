@@ -12,9 +12,9 @@ class CredentialStoreTests(unittest.TestCase):
 
             self.assertEqual(store.get_api_key(), "env-secret")
 
-    def test_missing_keyring_returns_none_when_no_env_key(self):
+    def test_missing_backend_returns_none_when_no_env_key(self):
         with mock.patch.dict(os.environ, {}, clear=True):
-            with mock.patch("orville_freecad.credentials._load_keyring", return_value=None):
+            with mock.patch("orville_freecad.credentials._load_backend", return_value=None):
                 store = CredentialStore()
 
                 self.assertIsNone(store.get_api_key())

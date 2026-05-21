@@ -19,6 +19,13 @@ from ..paths import artifact_cache_dir
 
 
 POLL_INTERVAL_SECONDS = 60
+MODE_REVIEW = "Review"
+MODE_ITERATE = "Iterate"
+REVIEW_PROMPT_PREFIX = (
+    "Review the current CAD result for manufacturability, dimensional risks, "
+    "fit issues, and concrete improvements. Do not redesign unless explicitly "
+    "asked. User request: "
+)
 
 _panel = None
 
@@ -58,7 +65,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
         header = QtWidgets.QHBoxLayout()
         logo_label = QtWidgets.QLabel(root)
-        logo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "resources", "orville.svg")
+        logo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "resources", "orville.png")
         pixmap = QtGui.QPixmap(logo_path)
         if not pixmap.isNull():
             logo_label.setPixmap(pixmap.scaled(32, 32, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
@@ -109,6 +116,16 @@ class OrvillePanel(QtWidgets.QDockWidget):
         self.prompt_edit.setFixedHeight(92)
         layout.addWidget(self.prompt_edit)
 
+        mode_bar = QtWidgets.QHBoxLayout()
+        mode_label = QtWidgets.QLabel("Mode", root)
+        self.mode_combo = QtWidgets.QComboBox(root)
+        self.mode_combo.addItems([MODE_REVIEW, MODE_ITERATE])
+        self.mode_combo.setToolTip("Review asks Orville to critique the current result. Iterate asks Orville to revise it.")
+        mode_bar.addWidget(mode_label)
+        mode_bar.addWidget(self.mode_combo)
+        mode_bar.addStretch(1)
+        layout.addLayout(mode_bar)
+
         send_bar = QtWidgets.QHBoxLayout()
         send_bar.addStretch(1)
         self.send_button = QtWidgets.QPushButton("Send", root)
@@ -153,7 +170,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
             stored_key = self.credential_store.get_api_key()
         except CredentialStoreError as exc:
             self.status_label.setText("Key store unavailable")
-            self._append_log(str(exc))
+            self._append_system(str(exc))
             return
 
         if os.getenv(ENV_VAR):
@@ -176,24 +193,24 @@ class OrvillePanel(QtWidgets.QDockWidget):
             self.session_api_key = api_key
             self.api_key_edit.clear()
             self._refresh_key_status()
-            self._append_log(
+            self._append_system(
                 "API key kept in memory for this FreeCAD session because secure OS storage is unavailable."
             )
             return
 
         self.api_key_edit.clear()
         self._refresh_key_status()
-        self._append_log("API key saved to the OS credential store.")
+        self._append_system("API key saved to secure OS storage.")
 
     def _clear_api_key(self):
         self.session_api_key = None
         try:
             self.credential_store.delete_api_key()
         except CredentialStoreError as exc:
-            self._append_log(str(exc))
+            self._append_system(str(exc))
 
         self._refresh_key_status()
-        self._append_log("API key cleared.")
+        self._append_system("API key cleared.")
 
     def _get_api_key(self) -> Optional[str]:
         try:
@@ -251,7 +268,9 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
         images = list(self.attachment_paths)
         followup_job_id = self.current_job_id
-        self._append_log(f"You: {prompt}")
+        mode = self.mode_combo.currentText()
+        api_prompt = self._prompt_for_mode(prompt, bool(followup_job_id), mode)
+        self._append_user(prompt)
         self.prompt_edit.clear()
         self.attachment_paths = []
         self._render_attachments()
@@ -260,22 +279,34 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
         thread = threading.Thread(
             target=self._submit_and_poll,
-            args=(api_key, prompt, images, followup_job_id),
+            args=(api_key, api_prompt, images, followup_job_id, mode),
             daemon=True,
         )
         thread.start()
 
-    def _submit_and_poll(self, api_key: str, prompt: str, images: list[str], followup_job_id: Optional[str]):
+    def _prompt_for_mode(self, prompt: str, has_existing_job: bool, mode: str) -> str:
+        if has_existing_job and mode == MODE_REVIEW:
+            return f"{REVIEW_PROMPT_PREFIX}{prompt}"
+        return prompt
+
+    def _submit_and_poll(
+        self,
+        api_key: str,
+        prompt: str,
+        images: list[str],
+        followup_job_id: Optional[str],
+        mode: str,
+    ):
         client = OrvilleApiClient(api_key)
         try:
             if followup_job_id:
                 job = client.create_message(followup_job_id, prompt, images)
                 job_id = job.get("id") or followup_job_id
-                self.signals.log_message.emit(f"Orville: iteration queued for {job_id}.")
+                self.signals.log_message.emit(f"{mode} queued.")
             else:
                 job = client.create_job(prompt, images)
                 job_id = job.get("id")
-                self.signals.log_message.emit(f"Orville: job queued as {job_id}.")
+                self.signals.log_message.emit("Design queued.")
 
             if not job_id:
                 raise OrvilleApiError(None, "missing_job_id", "Orville did not return a job id.")
@@ -302,7 +333,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
         status = job_status(job)
         explanation = job.get("explanation")
         if explanation:
-            self._append_log(f"Orville: {explanation}")
+            self._append_orville(explanation)
 
         if status == "failed":
             self._show_error("Orville job failed.")
@@ -316,10 +347,10 @@ class OrvillePanel(QtWidgets.QDockWidget):
             self.artifact_list.addItem(item)
 
         if artifacts:
-            self._append_log(f"Orville: {len(artifacts)} STEP artifact(s) ready.")
+            self._append_system(f"{len(artifacts)} STEP artifact(s) ready.")
             QtWidgets.QMessageBox.information(self, "Orville", "STEP artifact ready.")
         else:
-            self._append_log("Orville: job completed with no STEP artifact.")
+            self._append_system("Job completed with no STEP artifact.")
 
     def _download_selected_artifact(self, import_after: bool):
         item = self.artifact_list.currentItem()
@@ -338,7 +369,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
             if import_after:
                 self._import_downloaded_step(existing_path)
             else:
-                self._append_log(f"Downloaded: {existing_path}")
+                self._append_system("STEP artifact already downloaded.")
             return
 
         api_key = self._get_api_key()
@@ -372,7 +403,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
     def _artifact_downloaded(self, download, import_after: bool):
         self.downloaded_artifacts[download.artifact_id] = download.path
-        self._append_log(f"Downloaded: {download.path}")
+        self._append_system("Downloaded STEP artifact.")
         if import_after:
             self._import_downloaded_step(download.path)
 
@@ -382,7 +413,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
         except StepImportError as exc:
             self._show_error(str(exc))
             return
-        self._append_log(f"Imported: {path}")
+        self._append_system("Imported STEP artifact into the active document.")
 
     def _set_busy(self, busy: bool):
         self.send_button.setEnabled(not busy)
@@ -396,10 +427,28 @@ class OrvillePanel(QtWidgets.QDockWidget):
             self._refresh_key_status()
 
     def _append_log(self, message: str):
-        self.transcript.append(_escape_html(message))
+        self._append_system(message)
+
+    def _append_system(self, message: str):
+        self._append_message("System", message, "#8a949e", "#8a949e", "12px")
+
+    def _append_user(self, message: str):
+        self._append_message("You", message, "#d0d7de", "#58a6ff", "13px")
+
+    def _append_orville(self, message: str):
+        self._append_message("Orville", message, "#f2f4f8", "#f59e0b", "13px")
+
+    def _append_message(self, label: str, message: str, body_color: str, label_color: str, size: str):
+        html = (
+            f'<div style="margin: 0 0 8px 0; color: {body_color}; font-size: {size};">'
+            f'<span style="font-weight: 700; color: {label_color};">{_escape_html(label)}</span>'
+            f'<span style="color: {body_color};"> {_escape_html(message)}</span>'
+            "</div>"
+        )
+        self.transcript.append(html)
 
     def _show_error(self, message: str):
-        self._append_log(f"Error: {message}")
+        self._append_message("Error", message, "#ffb4ab", "#ff6b6b", "13px")
         QtWidgets.QMessageBox.warning(self, "Orville", message)
 
 

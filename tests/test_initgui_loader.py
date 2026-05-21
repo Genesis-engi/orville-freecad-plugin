@@ -60,8 +60,8 @@ class InitGuiLoaderTests(unittest.TestCase):
             self.assertEqual(workbench.MenuText, "Orville")
             self.assertEqual(workbench.ToolTip, "Generate CAD with Orville")
             self.assertTrue(
-                workbench.Icon.endswith("resources/orville.svg")
-                or workbench.Icon.endswith("resources\\orville.svg")
+                workbench.Icon.endswith("resources/orville.png")
+                or workbench.Icon.endswith("resources\\orville.png")
             )
 
             workbench.Initialize()
