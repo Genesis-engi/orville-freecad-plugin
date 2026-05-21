@@ -1,6 +1,7 @@
 """FreeCAD GUI registration for the Orville workbench."""
 
 import os
+import sys
 
 import FreeCAD as App
 import FreeCADGui as Gui
@@ -8,7 +9,14 @@ import FreeCADGui as Gui
 from orville_freecad import metadata
 
 
-ROOT_DIR = os.path.dirname(__file__)
+def _addon_root():
+    module_file = globals().get("__file__")
+    if not module_file:
+        module_file = sys._getframe().f_code.co_filename
+    return os.path.dirname(os.path.abspath(module_file))
+
+
+ROOT_DIR = _addon_root()
 RESOURCE_DIR = os.path.join(ROOT_DIR, "resources")
 ICON_PATH = os.path.join(RESOURCE_DIR, "orville.svg")
 
