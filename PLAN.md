@@ -2,7 +2,7 @@
 
 Date: 2026-05-21
 Target CAD package: FreeCAD
-Repo status: Initial open-source repository bootstrap
+Repo status: First implementation slice in progress
 
 ## Source Material
 
@@ -103,15 +103,15 @@ Repo status: Initial open-source repository bootstrap
 
 ## Development Milestones
 
-1. Bootstrap repo metadata: README, license, gitignore, this plan.
-2. Add FreeCAD workbench skeleton with `Init.py`, `InitGui.py`, command registration, placeholder icon, and `package.xml`.
-3. Build secure credential flow and API key settings UI.
-4. Implement Orville API client with mocked tests for create, iterate, poll, artifacts, download, and error handling.
-5. Build chat panel with prompt submission, image picker, validation, and job state display.
-6. Add background polling with cancellation-safe UI updates.
-7. Add STEP artifact download and import into the active document through FreeCAD's import stack.
-8. Add end-to-end manual validation notes for FreeCAD 1.1.x on Windows, macOS, and Linux.
-9. Prepare Addon Manager readiness docs and contribution guidelines.
+1. Done: Bootstrap repo metadata: README, license, gitignore, this plan.
+2. Done: Add FreeCAD workbench skeleton with `Init.py`, `InitGui.py`, command registration, icon, and `package.xml`.
+3. Done: Build secure credential flow and API key settings UI.
+4. Done: Implement Orville API client with mocked tests for create, iterate, artifacts, download, and error handling.
+5. Done: Build chat panel with prompt submission, image picker, validation, and job state display.
+6. Done: Add background polling with UI-thread signal updates.
+7. Done: Add STEP artifact download and import into the active document through FreeCAD's import stack.
+8. Next: Add end-to-end manual validation notes for FreeCAD 1.1.x on Windows, macOS, and Linux.
+9. Next: Prepare Addon Manager readiness docs and contribution guidelines.
 
 ## Open Questions
 

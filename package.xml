@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
+  <name>Orville</name>
+  <description>Generate and iterate on manufacturing-ready CAD models from FreeCAD using the Orville CAD API.</description>
+  <version>0.1.0</version>
+  <date>2026-05-21</date>
+  <freecadmin>1.1.0</freecadmin>
+  <pythonmin>3.11</pythonmin>
+  <depend type="python">keyring</depend>
+  <tag>CAD</tag>
+  <tag>AI</tag>
+  <tag>STEP</tag>
+  <maintainer email="ethen@genesis-engine.com">Ethen Daniels</maintainer>
+  <author email="ethen@genesis-engine.com">Ethen Daniels</author>
+  <license file="LICENSE">MIT</license>
+  <url type="repository" branch="main">https://github.com/ballistalabs/orville-freecad-plugin</url>
+  <url type="readme">https://github.com/ballistalabs/orville-freecad-plugin/blob/main/README.md</url>
+  <url type="documentation">https://www.ballistalabs.ai/docs/api</url>
+  <icon>resources/orville.svg</icon>
+
+  <content>
+    <workbench>
+      <name>Orville Workbench</name>
+      <subdirectory>./</subdirectory>
+      <icon>resources/orville.svg</icon>
+      <classname>OrvilleWorkbench</classname>
+    </workbench>
+  </content>
+</package>
