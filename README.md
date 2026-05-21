@@ -8,7 +8,8 @@ This repo is in early implementation. It includes a Python-only external FreeCAD
 
 Clone or copy this folder into your FreeCAD user `Mod` directory, then restart FreeCAD.
 
-- Windows: `%APPDATA%\FreeCAD\Mod\orville-freecad-plugin`
+- Windows FreeCAD 1.1: `%APPDATA%\FreeCAD\v1-1\Mod\orville-freecad-plugin`
+- Older Windows FreeCAD installs: `%APPDATA%\FreeCAD\Mod\orville-freecad-plugin`
 - macOS: `~/Library/Application Support/FreeCAD/Mod/orville-freecad-plugin`
 - Linux: `~/.local/share/FreeCAD/Mod/orville-freecad-plugin`
 
