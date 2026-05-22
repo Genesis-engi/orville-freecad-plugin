@@ -13,9 +13,9 @@ Clone or copy this folder into your FreeCAD user `Mod` directory, then restart F
 - macOS: `~/Library/Application Support/FreeCAD/Mod/orville-freecad-plugin`
 - Linux: `~/.local/share/FreeCAD/Mod/orville-freecad-plugin`
 
-Install the Python `keyring` package into FreeCAD's Python environment if Addon Manager does not install it automatically. You can also set `ORVILLE_API_KEY` for a session without storing the key.
-
 After restart, switch to the `Orville` workbench and click `Open Orville`.
+
+On first launch, Orville prompts for an API key before enabling the normal interface. The key is stored in secure OS storage when available. To replace or clear the key later, use the `Settings` button in the Orville panel header.
 
 ## Development
 

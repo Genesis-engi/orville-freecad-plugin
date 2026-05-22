@@ -55,11 +55,14 @@ class OrvillePanel(QtWidgets.QDockWidget):
         self.downloaded_artifacts = {}
         self.session_api_key: Optional[str] = None
         self.busy_count = 0
+        self.api_ready = False
         self.signals = _PanelSignals()
 
         self._build_ui()
         self._connect_signals()
         self._refresh_key_status()
+        self._set_api_ready(bool(self._get_api_key()))
+        QtCore.QTimer.singleShot(0, self._ensure_api_key_configured)
 
     def _build_ui(self):
         root = QtWidgets.QWidget(self)
@@ -85,18 +88,15 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
         self.status_label = QtWidgets.QLabel(root)
         header.addWidget(self.status_label)
+        self.settings_button = QtWidgets.QPushButton("Settings", root)
+        self.settings_button.setToolTip("Configure Orville settings")
+        header.addWidget(self.settings_button)
         layout.addLayout(header)
 
-        key_layout = QtWidgets.QHBoxLayout()
-        self.api_key_edit = QtWidgets.QLineEdit(root)
-        self.api_key_edit.setEchoMode(QtWidgets.QLineEdit.Password)
-        self.api_key_edit.setPlaceholderText("Orville API key")
-        key_layout.addWidget(self.api_key_edit, 1)
-        self.save_key_button = QtWidgets.QPushButton("Save", root)
-        self.clear_key_button = QtWidgets.QPushButton("Clear", root)
-        key_layout.addWidget(self.save_key_button)
-        key_layout.addWidget(self.clear_key_button)
-        layout.addLayout(key_layout)
+        self.setup_required_label = QtWidgets.QLabel("API key required. Open Settings to configure Orville.", root)
+        self.setup_required_label.setStyleSheet("color: #ffb4ab;")
+        self.setup_required_label.setVisible(False)
+        layout.addWidget(self.setup_required_label)
 
         self.transcript = QtWidgets.QTextEdit(root)
         self.transcript.setReadOnly(True)
@@ -187,8 +187,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
         self.setWidget(root)
 
     def _connect_signals(self):
-        self.save_key_button.clicked.connect(self._save_api_key)
-        self.clear_key_button.clicked.connect(self._clear_api_key)
+        self.settings_button.clicked.connect(self._open_settings_dialog)
         self.attach_button.clicked.connect(self._attach_images)
         self.remove_attachment_button.clicked.connect(self._remove_selected_attachment)
         self.send_button.clicked.connect(self._send_prompt)
@@ -219,25 +218,111 @@ class OrvillePanel(QtWidgets.QDockWidget):
         else:
             self.status_label.setText("API key needed")
 
-    def _save_api_key(self):
-        api_key = self.api_key_edit.text().strip()
+    def _get_api_key(self) -> Optional[str]:
         try:
-            self.credential_store.set_api_key(api_key)
-        except (CredentialStoreError, ValueError) as exc:
-            if not api_key:
-                self._show_error(str(exc))
-                return
-            self.session_api_key = api_key
-            self.api_key_edit.clear()
-            self._refresh_key_status()
-            self._append_system(
-                "API key kept in memory for this FreeCAD session because secure OS storage is unavailable."
-            )
+            return self.credential_store.get_api_key() or self.session_api_key
+        except CredentialStoreError:
+            return self.session_api_key
+
+    def _ensure_api_key_configured(self):
+        if self._get_api_key():
+            self._set_api_ready(True)
             return
 
-        self.api_key_edit.clear()
+        self._set_api_ready(False)
+        self._show_api_key_dialog(required=True)
+
+    def _open_settings_dialog(self):
+        self._show_api_key_dialog(required=False)
+
+    def _show_api_key_dialog(self, required: bool):
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle("Set Orville API Key" if required else "Orville Settings")
+        dialog.setModal(True)
+
+        layout = QtWidgets.QVBoxLayout(dialog)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        intro = QtWidgets.QLabel("Enter your Orville API key to use the FreeCAD workbench.", dialog)
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        current_status = "Configured" if self._get_api_key() else "Missing"
+        status_label = QtWidgets.QLabel(f"API key: {current_status}", dialog)
+        layout.addWidget(status_label)
+
+        api_key_edit = QtWidgets.QLineEdit(dialog)
+        api_key_edit.setEchoMode(QtWidgets.QLineEdit.Password)
+        api_key_edit.setPlaceholderText("Orville API key")
+        layout.addWidget(api_key_edit)
+
+        note = QtWidgets.QLabel("The key is stored in secure OS storage when available.", dialog)
+        note.setWordWrap(True)
+        note.setStyleSheet("color: #8a949e;")
+        layout.addWidget(note)
+
+        button_layout = QtWidgets.QHBoxLayout()
+        clear_button = QtWidgets.QPushButton("Clear API Key", dialog)
+        clear_button.setVisible(not required)
+        button_layout.addWidget(clear_button)
+        button_layout.addStretch(1)
+
+        cancel_button = QtWidgets.QPushButton("Cancel" if required else "Close", dialog)
+        save_button = QtWidgets.QPushButton("Save", dialog)
+        save_button.setDefault(True)
+        button_layout.addWidget(cancel_button)
+        button_layout.addWidget(save_button)
+        layout.addLayout(button_layout)
+
+        def save_key():
+            if self._store_api_key(api_key_edit.text().strip()):
+                dialog.accept()
+
+        def clear_key():
+            self._clear_api_key()
+            status_label.setText("API key: Missing")
+            self._set_api_ready(False)
+
+        save_button.clicked.connect(save_key)
+        clear_button.clicked.connect(clear_key)
+        cancel_button.clicked.connect(dialog.reject if required else dialog.accept)
+
+        result = dialog.exec_()
+        configured = bool(self._get_api_key())
+        self._set_api_ready(configured)
+        if required and result != QtWidgets.QDialog.Accepted and not configured:
+            self._append_system("API key setup was canceled.")
+
+    def _store_api_key(self, api_key: str) -> bool:
+        if not api_key:
+            self._show_error("API key is required.")
+            return False
+
+        try:
+            self.credential_store.set_api_key(api_key)
+        except CredentialStoreError as exc:
+            answer = QtWidgets.QMessageBox.question(
+                self,
+                "Secure Storage Unavailable",
+                f"{exc}\n\nUse this API key for the current FreeCAD session only?",
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                QtWidgets.QMessageBox.No,
+            )
+            if answer != QtWidgets.QMessageBox.Yes:
+                return False
+            self.session_api_key = api_key
+            self._append_system("API key kept in memory for this FreeCAD session.")
+        except ValueError as exc:
+            self._show_error(str(exc))
+            return False
+        else:
+            self.session_api_key = None
+            self._append_system("API key saved to secure OS storage.")
+
         self._refresh_key_status()
-        self._append_system("API key saved to secure OS storage.")
+        self._set_api_ready(True)
+        return True
 
     def _clear_api_key(self):
         self.session_api_key = None
@@ -249,11 +334,26 @@ class OrvillePanel(QtWidgets.QDockWidget):
         self._refresh_key_status()
         self._append_system("API key cleared.")
 
-    def _get_api_key(self) -> Optional[str]:
-        try:
-            return self.credential_store.get_api_key() or self.session_api_key
-        except CredentialStoreError:
-            return self.session_api_key
+    def _set_api_ready(self, ready: bool):
+        self.api_ready = ready
+        self.setup_required_label.setVisible(not ready)
+        self._set_controls_enabled(ready and self.busy_count == 0)
+
+    def _set_controls_enabled(self, enabled: bool):
+        for widget in (
+            self.attach_button,
+            self.remove_attachment_button,
+            self.attachments_list,
+            self.prompt_edit,
+            self.review_mode_button,
+            self.iterate_mode_button,
+            self.auto_open_checkbox,
+            self.send_button,
+            self.artifact_list,
+            self.download_button,
+            self.import_button,
+        ):
+            widget.setEnabled(enabled)
 
     def _attach_images(self):
         files, _ = QtWidgets.QFileDialog.getOpenFileNames(
@@ -487,9 +587,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
             self.busy_count = max(0, self.busy_count - 1)
 
         is_busy = self.busy_count > 0
-        self.send_button.setEnabled(not is_busy)
-        self.download_button.setEnabled(not is_busy)
-        self.import_button.setEnabled(not is_busy)
+        self._set_controls_enabled(self.api_ready and not is_busy)
         if is_busy:
             self.status_label.setText("Working")
         elif self.current_status:
