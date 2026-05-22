@@ -4,20 +4,36 @@ Open-source FreeCAD workbench for creating and iterating on CAD models through t
 
 This repo is in early implementation. It includes a Python-only external FreeCAD workbench, a dockable Orville chat panel, image attachment validation, secure API key storage through `keyring`, Orville CAD API request handling, searchable recent job loading, review assistant messages, job polling, STEP download, and import into FreeCAD through FreeCAD's import stack.
 
-## Manual Install
+## Install With Addon Manager
 
-Clone or copy this folder into your FreeCAD user `Mod` directory, then restart FreeCAD.
+This addon is not yet in the central FreeCAD addon catalog. Add it as a custom repository:
 
-- Windows FreeCAD 1.1: `%APPDATA%\FreeCAD\v1-1\Mod\orville-freecad-plugin`
-- Older Windows FreeCAD installs: `%APPDATA%\FreeCAD\Mod\orville-freecad-plugin`
-- macOS: `~/Library/Application Support/FreeCAD/Mod/orville-freecad-plugin`
-- Linux: `~/.local/share/FreeCAD/Mod/orville-freecad-plugin`
+1. Open FreeCAD.
+2. Go to `Edit > Preferences > Addon Manager > Addon Manager Options`.
+3. Add a custom repository:
+   - Repository URL: `https://github.com/Genesis-engi/orville-freecad-plugin.git`
+   - Branch: `main`
+4. Open `Tools > Addon Manager`.
+5. Refresh the addon list if needed.
+6. Select `Orville` and install it.
+7. Restart FreeCAD.
+
+If prompted to install the Python dependency `keyring`, accept it. Orville uses it for secure API key storage.
 
 After restart, switch to the `Orville` workbench and click `Open Orville`.
 
 On first launch, Orville prompts for an API key before enabling the normal interface. The key is stored in secure OS storage when available. To replace or clear the key later, use the `Settings` button in the Orville panel header.
 
 Use `New Chat` to start a fresh CAD job after a result comes back. The `Recent Jobs` list loads recent workspace jobs from the Orville API; double-click a job to restore its public chat history and latest STEP artifacts. `Review` sends a synchronous review assistant request against the completed job; `Iterate` sends a CAD follow-up.
+
+## Manual Install Fallback
+
+If Addon Manager cannot install from the custom repository, clone or copy this folder into your FreeCAD user `Mod` directory, then restart FreeCAD.
+
+- Windows FreeCAD 1.1: `%APPDATA%\FreeCAD\v1-1\Mod\orville-freecad-plugin`
+- Older Windows FreeCAD installs: `%APPDATA%\FreeCAD\Mod\orville-freecad-plugin`
+- macOS: `~/Library/Application Support/FreeCAD/Mod/orville-freecad-plugin`
+- Linux: `~/.local/share/FreeCAD/Mod/orville-freecad-plugin`
 
 ## Development
 

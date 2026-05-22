@@ -15,7 +15,7 @@
 - Confirm API key storage persists after app restart when `keyring` is available.
 - Confirm session-only API key fallback behaves clearly when `keyring` is unavailable.
 - Confirm clean upgrade behavior from an older installed copy.
-- Publish/tag the repo and submit or configure the final Addon Manager source.
+- Submit or configure the final central Addon Manager source after custom repository testing passes.
 
 ## End-To-End Test Pass
 
