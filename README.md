@@ -26,6 +26,16 @@ On first launch, Orville prompts for an API key before enabling the normal inter
 
 Use `New Chat` to start a fresh CAD job after a result comes back. The `Recent Jobs` list loads recent workspace jobs from the Orville API; double-click a job to restore its public chat history and latest STEP artifacts. `Review` sends a synchronous review assistant request against the completed job; `Iterate` sends a CAD follow-up.
 
+## Agent-Assisted Install
+
+An automation agent can install or update Orville without clicking through the UI. From a local checkout of this repo, run the helper script with FreeCAD's Python runtime:
+
+```bash
+FreeCADCmd scripts/install_freecad_addon.py --install-deps
+```
+
+The script first tries FreeCAD's Addon Manager Python API. If that API is unavailable, it falls back to cloning this repository into the user's FreeCAD `Mod` directory. It does not accept or store an API key; first launch still prompts for that inside Orville.
+
 ## Manual Install Fallback
 
 If Addon Manager cannot install from the custom repository, clone or copy this folder into your FreeCAD user `Mod` directory, then restart FreeCAD.
