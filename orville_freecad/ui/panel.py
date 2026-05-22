@@ -122,11 +122,39 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
         mode_bar = QtWidgets.QHBoxLayout()
         mode_label = QtWidgets.QLabel("Mode", root)
-        self.mode_combo = QtWidgets.QComboBox(root)
-        self.mode_combo.addItems([MODE_REVIEW, MODE_ITERATE])
-        self.mode_combo.setToolTip("Review asks Orville to critique the current result. Iterate asks Orville to revise it.")
+        self.review_mode_button = QtWidgets.QPushButton(MODE_REVIEW, root)
+        self.iterate_mode_button = QtWidgets.QPushButton(MODE_ITERATE, root)
+        self.mode_button_group = QtWidgets.QButtonGroup(root)
+        self.mode_button_group.setExclusive(True)
+
+        for button in (self.review_mode_button, self.iterate_mode_button):
+            button.setCheckable(True)
+            button.setMinimumHeight(26)
+            button.setStyleSheet(
+                """
+                QPushButton {
+                    padding: 3px 14px;
+                    border: 1px solid #4b5563;
+                    background: #24292f;
+                    color: #d0d7de;
+                }
+                QPushButton:checked {
+                    background: #f59e0b;
+                    border-color: #f59e0b;
+                    color: #111827;
+                    font-weight: 600;
+                }
+                """
+            )
+
+        self.review_mode_button.setChecked(True)
+        self.review_mode_button.setToolTip("Ask Orville to critique the current result.")
+        self.iterate_mode_button.setToolTip("Ask Orville to revise the current result.")
+        self.mode_button_group.addButton(self.review_mode_button)
+        self.mode_button_group.addButton(self.iterate_mode_button)
         mode_bar.addWidget(mode_label)
-        mode_bar.addWidget(self.mode_combo)
+        mode_bar.addWidget(self.review_mode_button)
+        mode_bar.addWidget(self.iterate_mode_button)
         mode_bar.addStretch(1)
         layout.addLayout(mode_bar)
 
@@ -277,7 +305,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
         images = list(self.attachment_paths)
         followup_job_id = self.current_job_id
-        mode = self.mode_combo.currentText()
+        mode = self._selected_mode()
         api_prompt = self._prompt_for_mode(prompt, bool(followup_job_id), mode)
         self._append_user(prompt)
         self.prompt_edit.clear()
@@ -297,6 +325,11 @@ class OrvillePanel(QtWidgets.QDockWidget):
         if has_existing_job and mode == MODE_REVIEW:
             return f"{REVIEW_PROMPT_PREFIX}{prompt}"
         return prompt
+
+    def _selected_mode(self) -> str:
+        if self.iterate_mode_button.isChecked():
+            return MODE_ITERATE
+        return MODE_REVIEW
 
     def _submit_and_poll(
         self,
