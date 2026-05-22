@@ -13,8 +13,8 @@
   <maintainer email="ethen@genesis-engine.com">Ethen Daniels</maintainer>
   <author email="ethen@genesis-engine.com">Ethen Daniels</author>
   <license file="LICENSE">MIT</license>
-  <url type="repository" branch="main">https://github.com/ballistalabs/orville-freecad-plugin</url>
-  <url type="readme">https://github.com/ballistalabs/orville-freecad-plugin/blob/main/README.md</url>
+  <url type="repository" branch="main">https://github.com/Genesis-engi/orville-freecad-plugin</url>
+  <url type="readme">https://github.com/Genesis-engi/orville-freecad-plugin/blob/main/README.md</url>
   <url type="documentation">https://www.ballistalabs.ai/docs/api</url>
   <icon>resources/orville.png</icon>
 
