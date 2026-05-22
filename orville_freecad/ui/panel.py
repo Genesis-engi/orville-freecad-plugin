@@ -12,8 +12,8 @@ from PySide import QtCore, QtGui, QtWidgets
 from ..api import OrvilleApiClient, OrvilleApiError
 from ..attachments import InvalidImageAttachmentError, build_image_attachments
 from ..credentials import CredentialStore, CredentialStoreError, ENV_VAR
-from ..import_step import StepImportError, import_step_file
-from ..jobs import is_job_active, job_status, step_artifacts
+from ..import_step import StepImportError, import_step_file, import_step_file_to_new_document
+from ..jobs import is_job_active, job_status, step_artifacts, top_level_step_artifact
 from ..metadata import PANEL_OBJECT_NAME, PANEL_TITLE
 from ..paths import artifact_cache_dir
 
@@ -26,6 +26,9 @@ REVIEW_PROMPT_PREFIX = (
     "fit issues, and concrete improvements. Do not redesign unless explicitly "
     "asked. User request: "
 )
+ACTION_DOWNLOAD = "download"
+ACTION_IMPORT_ACTIVE = "import_active"
+ACTION_OPEN_NEW = "open_new"
 
 _panel = None
 
@@ -36,7 +39,7 @@ class _PanelSignals(QtCore.QObject):
     error_message = QtCore.Signal(str)
     job_updated = QtCore.Signal(object)
     job_completed = QtCore.Signal(object)
-    artifact_downloaded = QtCore.Signal(object, bool)
+    artifact_downloaded = QtCore.Signal(object, object)
 
 
 class OrvillePanel(QtWidgets.QDockWidget):
@@ -51,6 +54,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
         self.current_status = ""
         self.downloaded_artifacts = {}
         self.session_api_key: Optional[str] = None
+        self.busy_count = 0
         self.signals = _PanelSignals()
 
         self._build_ui()
@@ -126,6 +130,11 @@ class OrvillePanel(QtWidgets.QDockWidget):
         mode_bar.addStretch(1)
         layout.addLayout(mode_bar)
 
+        self.auto_open_checkbox = QtWidgets.QCheckBox("Open result in new tab", root)
+        self.auto_open_checkbox.setChecked(True)
+        self.auto_open_checkbox.setToolTip("Automatically open the top-level STEP result in a new FreeCAD document.")
+        layout.addWidget(self.auto_open_checkbox)
+
         send_bar = QtWidgets.QHBoxLayout()
         send_bar.addStretch(1)
         self.send_button = QtWidgets.QPushButton("Send", root)
@@ -155,8 +164,8 @@ class OrvillePanel(QtWidgets.QDockWidget):
         self.attach_button.clicked.connect(self._attach_images)
         self.remove_attachment_button.clicked.connect(self._remove_selected_attachment)
         self.send_button.clicked.connect(self._send_prompt)
-        self.download_button.clicked.connect(lambda: self._download_selected_artifact(import_after=False))
-        self.import_button.clicked.connect(lambda: self._download_selected_artifact(import_after=True))
+        self.download_button.clicked.connect(lambda: self._download_selected_artifact(ACTION_DOWNLOAD))
+        self.import_button.clicked.connect(lambda: self._download_selected_artifact(ACTION_IMPORT_ACTIVE))
 
         self.signals.busy_changed.connect(self._set_busy)
         self.signals.log_message.connect(self._append_log)
@@ -348,17 +357,28 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
         if artifacts:
             self._append_system(f"{len(artifacts)} STEP artifact(s) ready.")
-            QtWidgets.QMessageBox.information(self, "Orville", "STEP artifact ready.")
+            if self.auto_open_checkbox.isChecked():
+                self._auto_open_job_result(job)
         else:
             self._append_system("Job completed with no STEP artifact.")
 
-    def _download_selected_artifact(self, import_after: bool):
+    def _auto_open_job_result(self, job: dict):
+        artifact = top_level_step_artifact(job)
+        if not artifact:
+            return
+        self._append_system("Opening top-level result in a new tab.")
+        self._download_artifact(artifact, ACTION_OPEN_NEW)
+
+    def _download_selected_artifact(self, action: str):
         item = self.artifact_list.currentItem()
         if item is None:
             self._show_error("Select a STEP artifact.")
             return
 
         artifact = item.data(QtCore.Qt.UserRole)
+        self._download_artifact(artifact, action)
+
+    def _download_artifact(self, artifact: dict, action: str):
         artifact_id = artifact.get("id") or artifact.get("artifact_id")
         if not artifact_id:
             self._show_error("Selected artifact has no id.")
@@ -366,8 +386,10 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
         existing_path = self.downloaded_artifacts.get(artifact_id)
         if existing_path and os.path.exists(existing_path):
-            if import_after:
+            if action == ACTION_IMPORT_ACTIVE:
                 self._import_downloaded_step(existing_path)
+            elif action == ACTION_OPEN_NEW:
+                self._open_downloaded_step(existing_path, artifact.get("filename"))
             else:
                 self._append_system("STEP artifact already downloaded.")
             return
@@ -381,12 +403,12 @@ class OrvillePanel(QtWidgets.QDockWidget):
         self.signals.busy_changed.emit(True)
         thread = threading.Thread(
             target=self._download_artifact_worker,
-            args=(api_key, artifact, import_after),
+            args=(api_key, artifact, action),
             daemon=True,
         )
         thread.start()
 
-    def _download_artifact_worker(self, api_key: str, artifact: dict, import_after: bool):
+    def _download_artifact_worker(self, api_key: str, artifact: dict, action: str):
         client = OrvilleApiClient(api_key)
         try:
             artifact_id = artifact.get("id") or artifact.get("artifact_id")
@@ -395,17 +417,19 @@ class OrvillePanel(QtWidgets.QDockWidget):
                 artifact_cache_dir(),
                 filename=artifact.get("filename"),
             )
-            self.signals.artifact_downloaded.emit(download, import_after)
+            self.signals.artifact_downloaded.emit(download, action)
         except Exception as exc:
             self.signals.error_message.emit(_clean_error_message(exc))
         finally:
             self.signals.busy_changed.emit(False)
 
-    def _artifact_downloaded(self, download, import_after: bool):
+    def _artifact_downloaded(self, download, action: str):
         self.downloaded_artifacts[download.artifact_id] = download.path
         self._append_system("Downloaded STEP artifact.")
-        if import_after:
+        if action == ACTION_IMPORT_ACTIVE:
             self._import_downloaded_step(download.path)
+        elif action == ACTION_OPEN_NEW:
+            self._open_downloaded_step(download.path, download.filename)
 
     def _import_downloaded_step(self, path: str):
         try:
@@ -415,11 +439,25 @@ class OrvillePanel(QtWidgets.QDockWidget):
             return
         self._append_system("Imported STEP artifact into the active document.")
 
+    def _open_downloaded_step(self, path: str, document_name: Optional[str] = None):
+        try:
+            opened_name = import_step_file_to_new_document(path, document_name)
+        except StepImportError as exc:
+            self._show_error(str(exc))
+            return
+        self._append_system(f"Opened result in new tab: {opened_name}.")
+
     def _set_busy(self, busy: bool):
-        self.send_button.setEnabled(not busy)
-        self.download_button.setEnabled(not busy)
-        self.import_button.setEnabled(not busy)
         if busy:
+            self.busy_count += 1
+        else:
+            self.busy_count = max(0, self.busy_count - 1)
+
+        is_busy = self.busy_count > 0
+        self.send_button.setEnabled(not is_busy)
+        self.download_button.setEnabled(not is_busy)
+        self.import_button.setEnabled(not is_busy)
+        if is_busy:
             self.status_label.setText("Working")
         elif self.current_status:
             self.status_label.setText(self.current_status.title())
