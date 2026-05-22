@@ -86,6 +86,37 @@ class OrvilleApiClient:
         path = f"/api/v1/cad/jobs/{quote(job_id)}/messages"
         return self._send_prompt_request("POST", path, prompt, image_paths, idempotency_key)
 
+    def review_job(
+        self,
+        job_id: str,
+        prompt: str,
+        revision_id: Optional[str] = None,
+        viewer_state: Optional[Mapping] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict:
+        self._ensure_id(job_id, "job_id")
+        prompt = (prompt or "").strip()
+        if not prompt:
+            raise ValueError("Prompt is required.")
+
+        body = {"prompt": prompt}
+        if revision_id:
+            body["revision_id"] = revision_id
+        if viewer_state is not None:
+            body["viewer_state"] = viewer_state
+
+        headers = {
+            "Content-Type": "application/json; charset=utf-8",
+            "Idempotency-Key": idempotency_key or str(uuid.uuid4()),
+        }
+        payload = json.dumps(body).encode("utf-8")
+        return self._send_json(
+            "POST",
+            f"/api/v1/cad/jobs/{quote(job_id)}/review",
+            body=payload,
+            headers=headers,
+        )
+
     def get_job(self, job_id: str) -> Dict:
         self._ensure_id(job_id, "job_id")
         return self._send_json("GET", f"/api/v1/cad/jobs/{quote(job_id)}")

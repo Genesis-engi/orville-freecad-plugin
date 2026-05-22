@@ -70,6 +70,10 @@ Repo status: First implementation slice in progress
 - Iterate:
   - `POST /api/v1/cad/jobs/{job_id}/messages`
   - Only allow follow-ups after the current run is not actively running.
+- Review:
+  - `POST /api/v1/cad/jobs/{job_id}/review`
+  - Use the synchronous review assistant endpoint for completed jobs.
+  - Do not start polling because review responses do not queue CAD iterations.
 - Download STEP:
   - Use artifact `download_url` from completed job response.
   - Follow redirects or request `redirect=false` if direct download handling is easier in FreeCAD's Python runtime.
@@ -78,7 +82,7 @@ Repo status: First implementation slice in progress
 
 - Workbench command opens a persistent dockable chat panel.
 - Top area: API key status and connect/settings action.
-- Middle area: message transcript with job status rows, generated explanations, and a recent job list.
+- Middle area: message transcript with job status rows, generated explanations, and a collapsible searchable recent job list.
 - Composer: prompt input, attach image button, attached image list with remove actions, send button.
 - Completion state: artifact list with `Download`, `Import into current document`, automatic top-level result open, and `New Chat` for starting the next job.
 - Notifications: update FreeCAD report/status output and show a Qt dialog or non-blocking banner when a job completes or fails.
@@ -118,8 +122,9 @@ Repo status: First implementation slice in progress
 6. Done: Add background polling with UI-thread signal updates.
 7. Done: Add STEP artifact download and import into the active document through FreeCAD's import stack.
 8. Done: Add recent job loading, public chat-history restore, new chat reset, and default iterate mode for new chats.
-9. Next: Add end-to-end manual validation notes for FreeCAD 1.1.x on Windows, macOS, and Linux.
-10. Next: Prepare Addon Manager readiness docs and contribution guidelines.
+9. Done: Switch review mode from prompt-prefix follow-up to the dedicated review assistant endpoint.
+10. Next: Add end-to-end manual validation notes for FreeCAD 1.1.x on Windows, macOS, and Linux.
+11. Next: Prepare Addon Manager readiness docs and contribution guidelines.
 
 ## Open Questions
 

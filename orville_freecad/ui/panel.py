@@ -21,11 +21,6 @@ from ..paths import artifact_cache_dir
 POLL_INTERVAL_SECONDS = 60
 MODE_REVIEW = "Review"
 MODE_ITERATE = "Iterate"
-REVIEW_PROMPT_PREFIX = (
-    "Review the current CAD result for manufacturability, dimensional risks, "
-    "fit issues, and concrete improvements. Do not redesign unless explicitly "
-    "asked. User request: "
-)
 ACTION_DOWNLOAD = "download"
 ACTION_IMPORT_ACTIVE = "import_active"
 ACTION_OPEN_NEW = "open_new"
@@ -42,6 +37,7 @@ class _PanelSignals(QtCore.QObject):
     artifact_downloaded = QtCore.Signal(object, object)
     recent_jobs_loaded = QtCore.Signal(object)
     job_context_loaded = QtCore.Signal(object, object)
+    review_completed = QtCore.Signal(object)
 
 
 class OrvillePanel(QtWidgets.QDockWidget):
@@ -53,6 +49,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
         self.credential_store = CredentialStore()
         self.attachment_paths = []
         self.current_job_id: Optional[str] = None
+        self.current_revision_id: Optional[str] = None
         self.current_status = ""
         self.downloaded_artifacts = {}
         self.session_api_key: Optional[str] = None
@@ -110,17 +107,38 @@ class OrvillePanel(QtWidgets.QDockWidget):
         layout.addWidget(self.transcript, 1)
 
         recent_header = QtWidgets.QHBoxLayout()
-        recent_label = QtWidgets.QLabel("Recent Jobs", root)
+        self.recent_toggle_button = QtWidgets.QToolButton(root)
+        self.recent_toggle_button.setText("Recent Jobs")
+        self.recent_toggle_button.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        self.recent_toggle_button.setArrowType(QtCore.Qt.DownArrow)
+        self.recent_toggle_button.setCheckable(True)
+        self.recent_toggle_button.setChecked(True)
         self.refresh_jobs_button = QtWidgets.QPushButton("Refresh", root)
-        recent_header.addWidget(recent_label)
+        recent_header.addWidget(self.recent_toggle_button)
         recent_header.addStretch(1)
         recent_header.addWidget(self.refresh_jobs_button)
         layout.addLayout(recent_header)
 
-        self.recent_jobs_list = QtWidgets.QListWidget(root)
+        self.recent_container = QtWidgets.QWidget(root)
+        recent_layout = QtWidgets.QVBoxLayout(self.recent_container)
+        recent_layout.setContentsMargins(0, 0, 0, 0)
+        recent_layout.setSpacing(4)
+
+        search_bar = QtWidgets.QHBoxLayout()
+        self.recent_search_edit = QtWidgets.QLineEdit(self.recent_container)
+        self.recent_search_edit.setPlaceholderText("Search jobs")
+        self.search_jobs_button = QtWidgets.QPushButton("Search", self.recent_container)
+        self.clear_jobs_search_button = QtWidgets.QPushButton("Clear", self.recent_container)
+        search_bar.addWidget(self.recent_search_edit, 1)
+        search_bar.addWidget(self.search_jobs_button)
+        search_bar.addWidget(self.clear_jobs_search_button)
+        recent_layout.addLayout(search_bar)
+
+        self.recent_jobs_list = QtWidgets.QListWidget(self.recent_container)
         self.recent_jobs_list.setMaximumHeight(100)
         self.recent_jobs_list.setToolTip("Double-click a job to load its chat history.")
-        layout.addWidget(self.recent_jobs_list)
+        recent_layout.addWidget(self.recent_jobs_list)
+        layout.addWidget(self.recent_container)
 
         attachment_bar = QtWidgets.QHBoxLayout()
         self.attach_button = QtWidgets.QPushButton("Attach Images", root)
@@ -208,7 +226,11 @@ class OrvillePanel(QtWidgets.QDockWidget):
     def _connect_signals(self):
         self.new_chat_button.clicked.connect(self._start_new_chat)
         self.settings_button.clicked.connect(self._open_settings_dialog)
+        self.recent_toggle_button.toggled.connect(self._set_recent_jobs_expanded)
         self.refresh_jobs_button.clicked.connect(self._refresh_recent_jobs)
+        self.search_jobs_button.clicked.connect(self._refresh_recent_jobs)
+        self.clear_jobs_search_button.clicked.connect(self._clear_recent_job_search)
+        self.recent_search_edit.returnPressed.connect(self._refresh_recent_jobs)
         self.recent_jobs_list.itemDoubleClicked.connect(self._load_recent_job)
         self.attach_button.clicked.connect(self._attach_images)
         self.remove_attachment_button.clicked.connect(self._remove_selected_attachment)
@@ -224,6 +246,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
         self.signals.artifact_downloaded.connect(self._artifact_downloaded)
         self.signals.recent_jobs_loaded.connect(self._recent_jobs_loaded)
         self.signals.job_context_loaded.connect(self._job_context_loaded)
+        self.signals.review_completed.connect(self._review_completed)
 
     def _refresh_key_status(self):
         try:
@@ -371,8 +394,9 @@ class OrvillePanel(QtWidgets.QDockWidget):
             self.remove_attachment_button,
             self.attachments_list,
             self.new_chat_button,
+            self.recent_toggle_button,
             self.refresh_jobs_button,
-            self.recent_jobs_list,
+            self.recent_container,
             self.prompt_edit,
             self.review_mode_button,
             self.iterate_mode_button,
@@ -386,6 +410,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
     def _start_new_chat(self):
         self.current_job_id = None
+        self.current_revision_id = None
         self.current_status = ""
         self.downloaded_artifacts = {}
         self.attachment_paths = []
@@ -397,23 +422,35 @@ class OrvillePanel(QtWidgets.QDockWidget):
         self._refresh_key_status()
         self._append_system("New chat started.")
 
+    def _set_recent_jobs_expanded(self, expanded: bool):
+        self.recent_container.setVisible(expanded)
+        if expanded:
+            self.recent_toggle_button.setArrowType(QtCore.Qt.DownArrow)
+        else:
+            self.recent_toggle_button.setArrowType(QtCore.Qt.RightArrow)
+
+    def _clear_recent_job_search(self):
+        self.recent_search_edit.clear()
+        self._refresh_recent_jobs()
+
     def _refresh_recent_jobs(self):
         api_key = self._get_api_key()
         if not api_key:
             return
 
+        query = self.recent_search_edit.text().strip()
         self.signals.busy_changed.emit(True)
         thread = threading.Thread(
             target=self._load_recent_jobs_worker,
-            args=(api_key,),
+            args=(api_key, query),
             daemon=True,
         )
         thread.start()
 
-    def _load_recent_jobs_worker(self, api_key: str):
+    def _load_recent_jobs_worker(self, api_key: str, query: str):
         client = OrvilleApiClient(api_key)
         try:
-            jobs = client.list_jobs(limit=20)
+            jobs = client.list_jobs(limit=20, query=query or None)
             self.signals.recent_jobs_loaded.emit(jobs)
         except Exception as exc:
             self.signals.error_message.emit(_clean_error_message(exc))
@@ -428,7 +465,11 @@ class OrvillePanel(QtWidgets.QDockWidget):
             item.setData(QtCore.Qt.UserRole, job)
             self.recent_jobs_list.addItem(item)
         if self.recent_jobs_list.count() == 0:
-            self._append_system("No recent jobs found.")
+            if self.recent_search_edit.text().strip():
+                empty_text = "No jobs matched your search."
+            else:
+                empty_text = "No recent jobs found."
+            self.recent_jobs_list.addItem(empty_text)
 
     def _load_recent_job(self, item):
         if item is None:
@@ -475,7 +516,8 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
     def _render_message_history(self, messages: dict):
         for message in messages.get("messages") or []:
-            content = (message.get("content") or "").strip()
+            review = message.get("review") or {}
+            content = (review.get("message") or message.get("content") or "").strip()
             if not content:
                 continue
             role = message.get("role")
@@ -537,7 +579,24 @@ class OrvillePanel(QtWidgets.QDockWidget):
         images = list(self.attachment_paths)
         followup_job_id = self.current_job_id
         mode = self._selected_mode()
-        api_prompt = self._prompt_for_mode(prompt, bool(followup_job_id), mode)
+        if mode == MODE_REVIEW:
+            if not followup_job_id or self.current_status != "completed":
+                self._show_error("Review requires a completed Orville job.")
+                return
+            if images:
+                self._show_error("Review mode does not support attached images yet.")
+                return
+            self._append_user(prompt)
+            self.prompt_edit.clear()
+            self.signals.busy_changed.emit(True)
+            thread = threading.Thread(
+                target=self._submit_review,
+                args=(api_key, followup_job_id, prompt, self.current_revision_id),
+                daemon=True,
+            )
+            thread.start()
+            return
+
         self._append_user(prompt)
         self.prompt_edit.clear()
         self.attachment_paths = []
@@ -547,20 +606,45 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
         thread = threading.Thread(
             target=self._submit_and_poll,
-            args=(api_key, api_prompt, images, followup_job_id, mode),
+            args=(api_key, prompt, images, followup_job_id, mode),
             daemon=True,
         )
         thread.start()
-
-    def _prompt_for_mode(self, prompt: str, has_existing_job: bool, mode: str) -> str:
-        if has_existing_job and mode == MODE_REVIEW:
-            return f"{REVIEW_PROMPT_PREFIX}{prompt}"
-        return prompt
 
     def _selected_mode(self) -> str:
         if self.iterate_mode_button.isChecked():
             return MODE_ITERATE
         return MODE_REVIEW
+
+    def _submit_review(
+        self,
+        api_key: str,
+        job_id: str,
+        prompt: str,
+        revision_id: Optional[str],
+    ):
+        client = OrvilleApiClient(api_key)
+        try:
+            response = client.review_job(job_id, prompt, revision_id=revision_id)
+            self.signals.review_completed.emit(response)
+        except Exception as exc:
+            self.signals.error_message.emit(_clean_error_message(exc))
+        finally:
+            self.signals.busy_changed.emit(False)
+
+    def _review_completed(self, response: dict):
+        self.current_job_id = response.get("job_id") or self.current_job_id
+        self.current_revision_id = response.get("revision_id") or self.current_revision_id
+        review = response.get("review") or {}
+        message = review.get("message")
+        if message:
+            self._append_orville(message)
+
+        proposal = review.get("iteration_proposal") or {}
+        if proposal.get("summary"):
+            self._append_system(f"Review suggests an iteration: {proposal.get('summary')}")
+
+        self._refresh_recent_jobs()
 
     def _submit_and_poll(
         self,
@@ -598,6 +682,7 @@ class OrvillePanel(QtWidgets.QDockWidget):
 
     def _job_updated(self, job: dict):
         self.current_job_id = job.get("id") or self.current_job_id
+        self.current_revision_id = job.get("latest_revision_id") or self.current_revision_id
         self.current_status = job_status(job)
         self.status_label.setText(self.current_status.title() or "Working")
 

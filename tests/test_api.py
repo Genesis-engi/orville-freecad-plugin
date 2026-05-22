@@ -83,6 +83,37 @@ class ApiClientTests(unittest.TestCase):
             "https://www.ballistalabs.ai/api/v1/cad/jobs/cadjob_123/messages",
         )
 
+    def test_review_job_uses_review_endpoint(self):
+        opener = FakeOpener(
+            body=b'{"job_id":"cadjob_123","revision_id":"rev_1","review":{"message":"Looks good"}}'
+        )
+        client = OrvilleApiClient("secret", opener=opener)
+
+        response = client.review_job(
+            "cadjob_123",
+            "Check manufacturability",
+            revision_id="rev_1",
+            viewer_state={"camera": {"target": [0, 0, 0]}},
+            idempotency_key="idem-review",
+        )
+
+        request, _ = opener.requests[0]
+        self.assertEqual(response["review"]["message"], "Looks good")
+        self.assertEqual(
+            request.full_url,
+            "https://www.ballistalabs.ai/api/v1/cad/jobs/cadjob_123/review",
+        )
+        self.assertEqual(request.get_header("Idempotency-key"), "idem-review")
+        self.assertIn("application/json", request.get_header("Content-type"))
+        self.assertEqual(
+            json.loads(request.data.decode("utf-8")),
+            {
+                "prompt": "Check manufacturability",
+                "revision_id": "rev_1",
+                "viewer_state": {"camera": {"target": [0, 0, 0]}},
+            },
+        )
+
     def test_list_jobs_uses_recent_jobs_endpoint(self):
         opener = FakeOpener(
             body=b'{"jobs":[{"id":"cadjob_123","status":"completed","title":"Cube"}],"next_cursor":null}'
