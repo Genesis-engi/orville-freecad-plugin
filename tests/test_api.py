@@ -83,6 +83,34 @@ class ApiClientTests(unittest.TestCase):
             "https://www.ballistalabs.ai/api/v1/cad/jobs/cadjob_123/messages",
         )
 
+    def test_list_jobs_uses_recent_jobs_endpoint(self):
+        opener = FakeOpener(
+            body=b'{"jobs":[{"id":"cadjob_123","status":"completed","title":"Cube"}],"next_cursor":null}'
+        )
+        client = OrvilleApiClient("secret", opener=opener)
+
+        response = client.list_jobs(limit=50, cursor="next page", query="one inch")
+
+        request, _ = opener.requests[0]
+        self.assertEqual(response["jobs"][0]["id"], "cadjob_123")
+        self.assertEqual(
+            request.full_url,
+            "https://www.ballistalabs.ai/api/v1/cad/jobs?limit=50&cursor=next+page&q=one+inch",
+        )
+
+    def test_get_messages_uses_job_messages_endpoint(self):
+        opener = FakeOpener(body=b'{"job_id":"cadjob_123","messages":[]}')
+        client = OrvilleApiClient("secret", opener=opener)
+
+        response = client.get_messages("cadjob_123")
+
+        request, _ = opener.requests[0]
+        self.assertEqual(response["job_id"], "cadjob_123")
+        self.assertEqual(
+            request.full_url,
+            "https://www.ballistalabs.ai/api/v1/cad/jobs/cadjob_123/messages",
+        )
+
     def test_http_error_parses_orville_error_shape(self):
         body = json.dumps({"error": {"code": "missing_prompt", "message": "Prompt is required"}}).encode()
         error = HTTPError("https://example.test", 400, "Bad Request", {}, io.BytesIO(body))

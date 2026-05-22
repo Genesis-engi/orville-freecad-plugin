@@ -1,6 +1,6 @@
 # Orville FreeCAD Plugin Plan
 
-Date: 2026-05-21
+Date: 2026-05-22
 Target CAD package: FreeCAD
 Repo status: First implementation slice in progress
 
@@ -57,9 +57,16 @@ Repo status: First implementation slice in progress
   - JSON when no images are attached.
   - Multipart form data with field name `images` when images are attached.
   - Always send a unique `Idempotency-Key` for write requests.
+- List recent jobs:
+  - `GET /api/v1/cad/jobs`
+  - Use `limit` and the opaque `cursor` for pagination.
+  - Show jobs from both `webapp` and `api` sources so users can continue workspace work from FreeCAD.
+- Load message history:
+  - `GET /api/v1/cad/jobs/{job_id}/messages`
+  - Render only public user and assistant messages; system/internal messages are not exposed by the API.
 - Poll job:
   - `GET /api/v1/cad/jobs/{job_id}`
-  - Poll every 60-120 seconds until `completed` or `failed`.
+  - Use `poll_after_seconds` when present, falling back to 60 seconds, until `completed` or `failed`.
 - Iterate:
   - `POST /api/v1/cad/jobs/{job_id}/messages`
   - Only allow follow-ups after the current run is not actively running.
@@ -71,9 +78,9 @@ Repo status: First implementation slice in progress
 
 - Workbench command opens a persistent dockable chat panel.
 - Top area: API key status and connect/settings action.
-- Middle area: message transcript with job status rows and generated explanations.
+- Middle area: message transcript with job status rows, generated explanations, and a recent job list.
 - Composer: prompt input, attach image button, attached image list with remove actions, send button.
-- Completion state: artifact list with `Download` and `Import into current document` actions.
+- Completion state: artifact list with `Download`, `Import into current document`, automatic top-level result open, and `New Chat` for starting the next job.
 - Notifications: update FreeCAD report/status output and show a Qt dialog or non-blocking banner when a job completes or fails.
 - Respect FreeCAD UI conventions: toolbars/menus for commands, dialog/task panel for settings, and no custom CAD viewport rendering unless needed.
 
@@ -110,8 +117,9 @@ Repo status: First implementation slice in progress
 5. Done: Build chat panel with prompt submission, image picker, validation, and job state display.
 6. Done: Add background polling with UI-thread signal updates.
 7. Done: Add STEP artifact download and import into the active document through FreeCAD's import stack.
-8. Next: Add end-to-end manual validation notes for FreeCAD 1.1.x on Windows, macOS, and Linux.
-9. Next: Prepare Addon Manager readiness docs and contribution guidelines.
+8. Done: Add recent job loading, public chat-history restore, new chat reset, and default iterate mode for new chats.
+9. Next: Add end-to-end manual validation notes for FreeCAD 1.1.x on Windows, macOS, and Linux.
+10. Next: Prepare Addon Manager readiness docs and contribution guidelines.
 
 ## Open Questions
 

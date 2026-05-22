@@ -4,6 +4,7 @@ from __future__ import annotations
 
 ACTIVE_STATUSES = {"queued", "running"}
 TERMINAL_STATUSES = {"completed", "failed"}
+DEFAULT_POLL_DELAY_SECONDS = 60
 
 
 def job_status(job: dict) -> str:
@@ -16,6 +17,21 @@ def is_job_active(job: dict) -> bool:
 
 def is_job_terminal(job: dict) -> bool:
     return job_status(job) in TERMINAL_STATUSES
+
+
+def poll_delay_seconds(job: dict, default_seconds: int = DEFAULT_POLL_DELAY_SECONDS) -> int:
+    value = (job or {}).get("poll_after_seconds")
+    if value is None:
+        return default_seconds
+
+    try:
+        delay = int(value)
+    except (TypeError, ValueError):
+        return default_seconds
+
+    if delay <= 0:
+        return default_seconds
+    return delay
 
 
 def step_artifacts(job: dict) -> list[dict]:

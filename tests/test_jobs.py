@@ -1,9 +1,18 @@
 import unittest
 
-from orville_freecad.jobs import step_artifacts, top_level_step_artifact
+from orville_freecad.jobs import poll_delay_seconds, step_artifacts, top_level_step_artifact
 
 
 class JobArtifactTests(unittest.TestCase):
+    def test_poll_delay_uses_api_recommended_delay(self):
+        self.assertEqual(poll_delay_seconds({"poll_after_seconds": 30}), 30)
+
+    def test_poll_delay_falls_back_for_missing_or_invalid_values(self):
+        self.assertEqual(poll_delay_seconds({}, 45), 45)
+        self.assertEqual(poll_delay_seconds({"poll_after_seconds": None}, 45), 45)
+        self.assertEqual(poll_delay_seconds({"poll_after_seconds": 0}, 45), 45)
+        self.assertEqual(poll_delay_seconds({"poll_after_seconds": "bad"}, 45), 45)
+
     def test_step_artifacts_filters_step_outputs(self):
         job = {
             "artifacts": [

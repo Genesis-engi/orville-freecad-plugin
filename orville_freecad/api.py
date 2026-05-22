@@ -9,7 +9,7 @@ from pathlib import Path
 import uuid
 from typing import Dict, Iterable, Mapping, Optional
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urlencode, urljoin
 from urllib.request import Request, build_opener
 
 from .attachments import ImageAttachment, build_image_attachments
@@ -89,6 +89,24 @@ class OrvilleApiClient:
     def get_job(self, job_id: str) -> Dict:
         self._ensure_id(job_id, "job_id")
         return self._send_json("GET", f"/api/v1/cad/jobs/{quote(job_id)}")
+
+    def list_jobs(
+        self,
+        limit: int = 20,
+        cursor: Optional[str] = None,
+        query: Optional[str] = None,
+    ) -> Dict:
+        limit = max(1, min(int(limit), 100))
+        params = {"limit": str(limit)}
+        if cursor:
+            params["cursor"] = cursor
+        if query:
+            params["q"] = query
+        return self._send_json("GET", f"/api/v1/cad/jobs?{urlencode(params)}")
+
+    def get_messages(self, job_id: str) -> Dict:
+        self._ensure_id(job_id, "job_id")
+        return self._send_json("GET", f"/api/v1/cad/jobs/{quote(job_id)}/messages")
 
     def list_artifacts(self, job_id: str) -> Dict:
         self._ensure_id(job_id, "job_id")

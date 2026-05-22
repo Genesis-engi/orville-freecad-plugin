@@ -1,6 +1,6 @@
 # FreeCAD Documentation Baseline
 
-Date checked: 2026-05-21
+Date checked: 2026-05-22
 
 This implementation is anchored to the current FreeCAD and Orville references below:
 
@@ -22,4 +22,5 @@ Key implementation choices from those sources:
 - Qt imports use FreeCAD's `PySide` compatibility module.
 - Addon Manager metadata lives in `package.xml` format 1.
 - STEP files are imported through FreeCAD's import stack rather than parsed by this addon.
-- The public OpenAPI schema checked on 2026-05-21 exposes CAD jobs, job messages, and artifacts. It does not expose a distinct review endpoint or message mode field, so review UX currently has to route through the same job message prompt path.
+- The public OpenAPI schema checked on 2026-05-22 is version `2026-05-21`. It exposes recent CAD job listing with `GET /api/v1/cad/jobs`, public message history with `GET /api/v1/cad/jobs/{jobId}/messages`, and `poll_after_seconds` as the recommended delay before the next poll.
+- The public OpenAPI schema does not expose a distinct review endpoint or message mode field, so review UX currently routes through the same job message prompt path.
