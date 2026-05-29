@@ -5,12 +5,14 @@
 - The addon has standard package metadata in `package.xml`.
 - `keyring` is declared as a Python dependency.
 - `scripts/install_freecad_addon.py` supports agent-assisted install/update.
+- `installers/windows/OrvilleFreeCAD.iss` builds the standard Windows setup wizard.
 - First launch prompts for an API key if none is configured.
 - API key can be changed later from Settings.
 - If secure credential storage is unavailable, the key can be kept for the current session only.
 
 ## What Is Left
 
+- Build and test `Orville-FreeCAD-Setup.exe` on Windows.
 - Test Addon Manager install from a clean user profile.
 - Test agent-assisted install with `FreeCADCmd scripts/install_freecad_addon.py --install-deps`.
 - Confirm Addon Manager installs or prompts for the `keyring` dependency.
