@@ -32,7 +32,7 @@ VersionInfoProductVersion={#AppVersion}
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "deps\keyring"; Description: "Install or update the Python keyring dependency"; Flags: checkedonce
+Name: "keyring"; Description: "Install or update the Python keyring dependency"; Flags: checkedonce
 Name: "launch"; Description: "Launch FreeCAD after installation"; Flags: unchecked
 
 [Files]
@@ -162,7 +162,7 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then begin
-    if WizardIsTaskSelected('deps\keyring') then
+    if WizardIsTaskSelected('keyring') then
       InstallKeyring();
     if WizardIsTaskSelected('launch') then
       LaunchFreeCAD();
